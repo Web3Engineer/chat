@@ -376,7 +376,9 @@
   // ── State ─────────────────────────────────────────────────────────────────────
   let room        = null;
   let sendMsg     = null;
+  let receiveMsg  = null;
   let sendNick    = null;
+  let receiveNick = null;
   let myNick      = 'Anonymous';
   let myRoom      = '';
   let localStream = null;   // camera/mic stream
@@ -614,10 +616,8 @@
       myRoom
     );
 
-    [sendMsg]  = room.makeAction('msg');
-    [sendNick] = room.makeAction('nick');
-    const [, receiveNick] = room.makeAction('nick');
-    const [, receiveMsg]  = room.makeAction('msg');
+    [sendMsg,  receiveMsg]  = room.makeAction('msg');
+    [sendNick, receiveNick] = room.makeAction('nick');
 
     // ── Incoming video streams from peers ──────────────────────────────────────
     room.onPeerStream((stream, peerId, metadata) => {
