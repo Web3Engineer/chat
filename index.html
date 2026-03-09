@@ -367,9 +367,33 @@
 
   const RTC_CONFIG = {
     iceServers: [
+      // Google STUN
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'turn:relay1.expressturn.com:3478', username: 'efQUQ79N77B5BNVVKF', credential: 'N4EAUgpjMzPLrxSS' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      // Twilio STUN
+      { urls: 'stun:global.stun.twilio.com:3478' },
+      // Microsoft STUN
+      { urls: 'stun:stun.services.mozilla.com' },
+      // OpenRelay TURN (free, reliable)
+      { 
+        urls: 'turn:openrelay.metered.ca:80', 
+        username: 'openrelayproject', 
+        credential: 'openrelayproject' 
+      },
+      { 
+        urls: 'turn:openrelay.metered.ca:443', 
+        username: 'openrelayproject', 
+        credential: 'openrelayproject' 
+      },
+      // Original expressturn as backup
+      { 
+        urls: 'turn:relay1.expressturn.com:3478', 
+        username: 'efQUQ79N77B5BNVVKF', 
+        credential: 'N4EAUgpjMzPLrxSS' 
+      },
     ],
   };
 
@@ -611,10 +635,12 @@
 
     probeTrackers();
 
+    console.log('JOINING ROOM:', myRoom, 'with trackers:', TRACKERS);
     room = joinRoom(
       { appId: 'chitchatter-fork-v1', relayUrls: TRACKERS, rtcConfig: RTC_CONFIG },
       myRoom
     );
+    console.log('ROOM CREATED:', room);
 
     [sendMsg,  receiveMsg]  = room.makeAction('msg');
     [sendNick, receiveNick] = room.makeAction('nick');
@@ -634,14 +660,30 @@
     });
 
     room.onPeerJoin(peerId => {
+      console.log('PEER JOINED:', peerId);
       peers.set(peerId, { nick: '', videoTile: null });
       renderPeers();
-      appendMsg('system', '', 'A peer joined the room', Date.now());
+      appendMsg('system', '', `Peer ${peerId.slice(0,8)} joined the room`, Date.now());
       // send our nickname
       sendNick({ nick: myNick }, peerId);
       // share our stream if already live
       if (localStream)  room.addStream(localStream,  peerId);
       if (screenStream) room.addStream(screenStream, peerId);
+      
+      // Log connection state changes for this peer
+      const peersMap = room.getPeers();
+      const peerConnection = peersMap.find(([id]) => id === peerId)?.[1];
+      if (peerConnection) {
+        peerConnection.connection.addEventListener('connectionstatechange', () => {
+          console.log(`PEER ${peerId.slice(0,8)} CONNECTION STATE:`, peerConnection.connection.connectionState);
+        });
+        peerConnection.connection.addEventListener('icegatheringstatechange', () => {
+          console.log(`PEER ${peerId.slice(0,8)} ICE GATHERING:`, peerConnection.connection.iceGatheringState);
+        });
+        peerConnection.connection.addEventListener('iceconnectionstatechange', () => {
+          console.log(`PEER ${peerId.slice(0,8)} ICE CONNECTION:`, peerConnection.connection.iceConnectionState);
+        });
+      }
     });
 
     room.onPeerLeave(peerId => {
@@ -663,6 +705,7 @@
     });
 
     receiveMsg(({ author, text, ts }, _peerId) => {
+      console.log('RECEIVED MSG:', { author, text, ts, peerId: _peerId });
       appendMsg('theirs', author, text, ts);
     });
 
@@ -675,6 +718,7 @@
     const text = msgInput.value.trim();
     if (!text || !sendMsg) return;
     const ts = Date.now();
+    console.log('SENDING MSG:', { author: myNick, text, ts });
     sendMsg({ author: myNick, text, ts });
     appendMsg('mine', myNick, text, ts);
     msgInput.value = '';
